@@ -227,6 +227,47 @@ jobs:
               ;;
           esac
 
+          # Surface the report on the run's Summary page so reviewers do not
+          # have to dig through the logs to see what the gate found.
+          {
+            echo "## API compatibility report"
+            echo
+            case "${status}" in
+              200)
+                echo "✅ **No breaking changes detected** between \`main\` and this pull request."
+                ;;
+              409)
+                echo "❌ **Breaking API changes detected** between \`main\` and this pull request."
+                ;;
+            esac
+            echo
+            echo "| Revision | Commit |"
+            echo "| --- | --- |"
+            echo "| baseline (\`main\`) | \`${BASE_SHA}\` |"
+            echo "| candidate (PR) | \`${HEAD_SHA}\` |"
+            echo
+            # When the engine reports a breakingChanges array, render it as a
+            # table first; the full JSON report follows either way.
+            if jq -e '.breakingChanges? | type == "array" and length > 0' \
+                "${RUNNER_TEMP}/report.json" > /dev/null 2>&1; then
+              echo "### Breaking changes"
+              echo
+              echo "| # | Change |"
+              echo "| --- | --- |"
+              jq -r '.breakingChanges | to_entries[] | "| \(.key + 1) | \(.value | tostring | gsub("\\|"; "\\\\|") | gsub("\n"; " ")) |"' \
+                "${RUNNER_TEMP}/report.json"
+              echo
+            fi
+            echo "<details>"
+            echo "<summary>Full report (JSON)</summary>"
+            echo
+            echo '```json'
+            jq . "${RUNNER_TEMP}/report.json" 2>/dev/null || cat "${RUNNER_TEMP}/report.json"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Fail the gate when the contract is broken
         if: steps.compare.outputs.status == '409'
         run: |
