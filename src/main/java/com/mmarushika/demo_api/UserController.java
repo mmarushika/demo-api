@@ -1,7 +1,6 @@
 package com.mmarushika.demo_api;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -9,7 +8,6 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,19 +46,6 @@ public class UserController {
 		return this.users.values().stream()
 				.sorted(Comparator.comparing(User::id))
 				.toList();
-	}
-
-	@GetMapping("/{id}")
-	@Operation(summary = "Get a user by id")
-	@ApiResponse(responseCode = "200", description = "The requested user.")
-	@ApiResponse(responseCode = "404", description = "No user exists for the supplied identifier.")
-	public ResponseEntity<User> getUser(
-			@Parameter(description = "Identifier of the user.", example = "1", required = true)
-			@PathVariable Long id) {
-
-		User user = this.users.get(id);
-
-		return user == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(user);
 	}
 
 	@PostMapping

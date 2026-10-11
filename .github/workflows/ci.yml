@@ -227,6 +227,66 @@ jobs:
               ;;
           esac
 
+          # Surface the report on the run's Summary page.
+          {
+            echo "## API compatibility report"
+            echo
+
+            case "${status}" in
+              200)
+                echo "✅ **No breaking changes detected** between \`main\` and this pull request."
+                ;;
+              409)
+                echo "❌ **Breaking API changes detected** between \`main\` and this pull request."
+                ;;
+            esac
+
+            echo
+            echo "| Revision | Commit |"
+            echo "| --- | --- |"
+            echo "| baseline (\`main\`) | \`${BASE_SHA}\` |"
+            echo "| candidate (PR) | \`${HEAD_SHA}\` |"
+            echo
+
+            # Display every detected change, with breaking changes first.
+            if jq -e '.changes | type == "array" and length > 0' \
+                "${RUNNER_TEMP}/report.json" > /dev/null 2>&1; then
+              echo "### Detected changes"
+              echo
+              echo "| Impact | Type | Location | Description |"
+              echo "| --- | --- | --- | --- |"
+
+              jq -r '
+                def rank:
+                  if .impact == "BREAKING" then 0
+                  elif .impact == "NON_BREAKING" then 1
+                  else 2
+                  end;
+
+                (.changes // [])
+                | sort_by(rank)
+                | .[]
+                | "| \(.impact // "UNKNOWN" | gsub("\\|"; "\\\\|")) | \(.type // "UNKNOWN" | gsub("\\|"; "\\\\|")) | \([.location.method, .location.path] | map(select(. != null and . != "")) | join(" ") | gsub("\\|"; "\\\\|") | gsub("[\r\n]+"; " ")) | \((.message // "") | gsub("\\|"; "\\\\|") | gsub("[\r\n]+"; " ")) |"
+              ' "${RUNNER_TEMP}/report.json"
+
+              echo
+            else
+              echo "### Detected changes"
+              echo
+              echo "No changes were reported by the compatibility engine."
+              echo
+            fi
+
+            echo "<details>"
+            echo "<summary>Full report (JSON)</summary>"
+            echo
+            echo '```json'
+            jq . "${RUNNER_TEMP}/report.json" 2>/dev/null || cat "${RUNNER_TEMP}/report.json"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Fail the gate when the contract is broken
         if: steps.compare.outputs.status == '409'
         run: |
